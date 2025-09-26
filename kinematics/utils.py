@@ -107,46 +107,6 @@ def subPRVs(phi, e, phi1, e1):
     return phi2, e2
 
 
-def DCMfromQuaternion(b): #### arreglar
-    """
-    Convert a quaternion to a Direction Cosine Matrix (DCM).
-    
-    :param b: A 4-element array representing the quaternion (b0, b1, b2, b3).
-    :return: ndarray, A 3x3 Direction Cosine Matrix (DCM) representing the rotation.
-    """
-    base_diag = np.identity(3)*(b[0]**2)
-    ext_diag = np.zeros((3, 3))
-    ext_diag_row_idx, ext_diag_col_idx = np.diag_indices(3)
-    for i in zip(ext_diag_row_idx, ext_diag_col_idx):
-        row = i[0]
-        col = i[1]
-        alt_b_val = b[row+1]**2
-        b_group = -(b[1]**2)-(b[2]**2)-(b[3]**2)
-        val = b_group + 2*alt_b_val
-        ext_diag[row, col] = val
-
-    base_off_diag = np.zeros((3, 3))
-    ext_off_diag = np.zeros((3, 3))
-    triu_row_idx, triu_col_idx = np.triu_indices(3, k=1)
-
-    for i in zip(triu_row_idx, triu_col_idx):
-        row = i[0]
-        col = i[1]
-        val1 = 2*b[row+1]*b[col+1]
-        val2 = 2*b[0]*b[4-(row+col)]
-        base_off_diag[row, col] = val1
-        ext_off_diag[row, col] = val2
-    base_off_diag = base_off_diag + base_off_diag.T
-    ext_off_diag = ext_off_diag + ext_off_diag.T
-
-    sign_array = np.ones((3, 3), dtype=int)
-    sign_array[::2, ::2] = -1
-    sign_array[1::2, 1::2] = -1
-    ext_off_diag = np.multiply(ext_off_diag, sign_array)
-
-    return base_diag + base_off_diag + ext_diag + ext_off_diag
-
-
 def tilde(x):
     """
     Returns the skew-symmetric matrix (also known as the "tilde" matrix) of a vector x.
@@ -350,3 +310,46 @@ def normalized_integrator(qdot, q0, t0, tf, dt):
         q_new = q[i] + qdot(q[i], t) * dt
         q[i + 1] = q_new / np.linalg.norm(q_new)
     return q
+
+
+def rotate(dim, rad):
+    """
+    Returns the Direction Cosine Matrix (DCM) for a rotation of `rad` radians about the `dim` axis.
+    
+    :param dim: The axis about which to rotate, represented as an integer: 
+                1 for x-axis, 2 for y-axis, and 3 for z-axis.
+    :param rad: The rotation angle in radians.
+    :return: R (ndarray), The 3x3 Direction Cosine Matrix representing the rotation.
+    """
+    orders = np.array([[1, 2, 3], [3, 1, 2], [2, 3, 1]])
+    r = np.array([[1, 0, 0], [0, np.cos(rad), np.sin(rad)], [0, -np.sin(rad), np.cos(rad)]])
+    R = r[orders[dim-1] - 1][:, orders[dim-1] - 1]
+    return R
+
+
+def eulerRad_2_dcm(dims, rads):
+    """
+    Returns the Direction Cosine Matrix (DCM) equivalent of a set of Euler angles in radians.
+    
+    :param dims: A list of integers representing the axes of rotation in the Euler angle order: 
+                 1 for x-axis, 2 for y-axis, and 3 for z-axis.
+    :param rads: A list or array of rotation angles in radians, corresponding to each axis in `dims`.
+    :return: R (ndarray), The 3x3 Direction Cosine Matrix representing the total rotation.
+    """
+    R = np.eye(3)
+    for i in range(len(dims)):
+        R = rotate(dims[i], rads[i]).dot(R)
+    return R
+
+
+def eulerDeg_2_dcm(dims, deg):
+    """
+    Returns the Direction Cosine Matrix (DCM) equivalent of a set of Euler angles in degrees.
+    
+    :param dims: A list of integers representing the axes of rotation in the Euler angle order: 
+                 1 for x-axis, 2 for y-axis, and 3 for z-axis.
+    :param deg: A list or array of rotation angles in degrees, corresponding to each axis in `dims`.
+    :return: R (ndarray), The 3x3 Direction Cosine Matrix representing the total rotation.
+    """
+    R = eulerRad_2_dcm(dims, np.deg2rad(deg))
+    return R
